@@ -7,6 +7,7 @@
 
 import Foundation
 import AVFoundation
+import UIKit
 
 var documentsUrl: URL? {
     return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
