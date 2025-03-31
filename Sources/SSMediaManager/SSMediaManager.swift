@@ -11,7 +11,6 @@ public class SSMediaManager{
     nonisolated(unsafe) public static let shared = SSMediaManager()
     
     private init(){
-        
     }
     
     @MainActor fileprivate func uploadFile(_ media: SSMedia, _ baseS3URL: String, _ indexPath: IndexPath?, _ index: Int?, _ completion: @escaping UploadCompletion) {
