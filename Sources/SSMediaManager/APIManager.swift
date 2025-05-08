@@ -7,7 +7,7 @@ public typealias UploadCompletion = (_ json: [String: Any]?, _ data: Data?, _ re
 struct APIManager{
     
     var session:Session
-    @MainActor public static var shared = APIManager()
+    public static var shared = APIManager()
     
     private init(){
         let configuration = URLSessionConfiguration.default

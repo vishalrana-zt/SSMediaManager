@@ -13,7 +13,7 @@ public class SSMediaManager{
     private init(){
     }
     
-    @MainActor fileprivate func uploadFile(_ media: SSMedia, _ baseS3URL: String, _ indexPath: IndexPath?, _ index: Int?, _ completion: @escaping UploadCompletion) {
+    fileprivate func uploadFile(_ media: SSMedia, _ baseS3URL: String, _ indexPath: IndexPath?, _ index: Int?, _ completion: @escaping UploadCompletion) {
         APIManager.shared.getUploadUrl(media: media, baseS3URL: baseS3URL,indexPath: indexPath!, index: index!) { json, data, response, error, indexPath, index in
             var mediaWithS3 = media
             if let s3url = json?["s3URL"] as? String{
@@ -27,7 +27,7 @@ public class SSMediaManager{
         }
     }
     
-    @MainActor public func uploadFileWith(media:SSMedia, baseS3URL: String, indexPath: IndexPath?=nil, index: Int?=0, completion:@escaping UploadCompletion){
+    public func uploadFileWith(media:SSMedia, baseS3URL: String, indexPath: IndexPath?=nil, index: Int?=0, completion:@escaping UploadCompletion){
         if((media.mimeType ?? "").contains("video")){
             let inputUrl = URL(fileURLWithPath:media.filePath ?? "")
             let fileNameWithoutExtension = self.removeExtension(fileName: media.name)
