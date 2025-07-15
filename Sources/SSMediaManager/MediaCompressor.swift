@@ -43,8 +43,8 @@ class MediaCompressor {
     
     class func compressImage(fileName: String, completion: @escaping() -> Void) {
         
-        let selectedValue = UserDefaults.standard.value(forKey: "CompressionMode") as? String ?? ""
-        let compressionMode = selectedValue.fetchCompressionModeFromUserValue()
+        let modeValue = UserDefaults.standard.value(forKey: "CompressionModeFloat") as? CGFloat ?? 0.5
+        let compressionMode = CompressionMode(rawValue: modeValue) ?? CompressionMode.medium
         if compressionMode == .noCompression{
             completion()
             return
@@ -179,41 +179,6 @@ extension Data {
         return 0.0
     }
 }
-
-extension String{
-    public func fetchCompressionModeFromUserValue() -> CompressionMode{
-        switch self {
-        case "low":
-            return CompressionMode.low
-        case "medium":
-            return CompressionMode.medium
-        case "high":
-            return CompressionMode.high
-        case "no":
-            return CompressionMode.noCompression
-        default:
-            return CompressionMode.medium
-        }
-    }
-    
-    public func fetchCompressionModeFromDisplayValue() -> CompressionMode{
-        switch self {
-        case MediaCompressor.localize("lbl_Low"):
-            return CompressionMode.low
-        case MediaCompressor.localize("lbl_Medium"):
-            return CompressionMode.medium
-        case MediaCompressor.localize("lbl_High"):
-            return CompressionMode.high
-        case MediaCompressor.localize("lbl_No_Compression"):
-            return CompressionMode.noCompression
-        default:
-            return CompressionMode.medium
-        }
-    }
-}
-
-
-
 
 extension MediaCompressor {
     static func localize(_ key: String) -> String {
