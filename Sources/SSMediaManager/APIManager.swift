@@ -50,6 +50,15 @@ struct APIManager{
                 debugPrint("Added EXIF metadata headers: \(exifHeaders.keys.joined(separator: ", "))")
             }
             
+            // Add video metadata headers for video uploads
+            if (media.mimeType ?? "").contains("video"), let videoMetadata = media.exifMetadata {
+                let videoHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: videoMetadata)
+                for (key, value) in videoHeaders {
+                    headers[key] = value
+                }
+                debugPrint("Added video metadata headers: \(videoHeaders.keys.joined(separator: ", "))")
+            }
+            
             session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
             if (data.response?.statusCode == 200){
                 debugPrint("got upload success --->>\(data.response.debugDescription)")

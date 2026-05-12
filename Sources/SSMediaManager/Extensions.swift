@@ -9,6 +9,7 @@ import Foundation
 import ImageIO
 import UIKit
 import UniformTypeIdentifiers
+import AVFoundation
 
 public enum CompressionMode: CGFloat {
     case low     = 0.75
@@ -65,6 +66,60 @@ class EXIFMetadataHelper {
         return metadata
     }
     
+    /// Extract metadata from video file URL
+    static func extractVideoMetadata(from fileURL: URL) -> [String: Any]? {
+        let asset = AVAsset(url: fileURL)
+        var metadata: [String: Any] = [:]
+        
+        // Extract common metadata
+        let commonMetadata = asset.commonMetadata
+        for item in commonMetadata {
+            if let key = item.commonKey?.rawValue,
+               let value = item.value {
+                metadata[key] = value
+            }
+        }
+        
+        // Extract metadata by format (QuickTime, ID3, etc.)
+        for format in asset.availableMetadataFormats {
+            let formatMetadata = asset.metadata(forFormat: format)
+            for item in formatMetadata {
+                if let key = item.key as? String,
+                   let value = item.value {
+                    metadata[key] = value
+                }
+            }
+        }
+        
+        // Extract creation date
+        if let creationDate = asset.creationDate {
+            if let dateValue = creationDate.value as? Date {
+                metadata["creationDate"] = dateValue
+            } else if let dateString = creationDate.stringValue {
+                metadata["creationDate"] = dateString
+            }
+        }
+        
+        // Extract location
+        let locationMetadata = asset.metadata(forFormat: .quickTimeMetadata).filter {
+            $0.identifier == .quickTimeMetadataLocationISO6709
+        }
+        if let locationItem = locationMetadata.first,
+           let locationString = locationItem.stringValue {
+            metadata["location"] = locationString
+        }
+        
+        // Extract video track properties
+        if let videoTrack = asset.tracks(withMediaType: .video).first {
+            metadata["videoWidth"] = Int(videoTrack.naturalSize.width)
+            metadata["videoHeight"] = Int(videoTrack.naturalSize.height)
+            metadata["videoFrameRate"] = videoTrack.nominalFrameRate
+            metadata["videoDuration"] = asset.duration.seconds
+        }
+        
+        return metadata.isEmpty ? nil : metadata
+    }
+    
     /// Convert EXIF metadata to S3 metadata headers format
     static func convertToS3Headers(exifMetadata: [String: Any]?) -> [String: String] {
         guard let metadata = exifMetadata else { return [:] }
@@ -113,6 +168,65 @@ class EXIFMetadataHelper {
         }
         if let orientation = metadata[kCGImagePropertyOrientation as String] as? Int {
             headers["x-amz-meta-image-orientation"] = "\(orientation)"
+        }
+        
+        return headers
+    }
+    
+    /// Convert video metadata to S3 metadata headers format
+    static func convertVideoMetadataToS3Headers(videoMetadata: [String: Any]?) -> [String: String] {
+        guard let metadata = videoMetadata else { return [:] }
+        
+        var headers: [String: String] = [:]
+        
+        // Creation date
+        if let creationDate = metadata["creationDate"] {
+            if let date = creationDate as? Date {
+                let formatter = ISO8601DateFormatter()
+                headers["x-amz-meta-video-creation-date"] = formatter.string(from: date)
+            } else if let dateString = creationDate as? String {
+                headers["x-amz-meta-video-creation-date"] = dateString
+            }
+        }
+        
+        // Location (ISO 6709 format)
+        if let location = metadata["location"] as? String {
+            headers["x-amz-meta-video-location"] = location
+        }
+        
+        // Video dimensions
+        if let width = metadata["videoWidth"] as? Int {
+            headers["x-amz-meta-video-width"] = "\(width)"
+        }
+        if let height = metadata["videoHeight"] as? Int {
+            headers["x-amz-meta-video-height"] = "\(height)"
+        }
+        
+        // Frame rate
+        if let frameRate = metadata["videoFrameRate"] as? Float {
+            headers["x-amz-meta-video-framerate"] = "\(frameRate)"
+        }
+        
+        // Duration
+        if let duration = metadata["videoDuration"] as? Double {
+            headers["x-amz-meta-video-duration"] = "\(duration)"
+        }
+        
+        // Common metadata keys
+        if let title = metadata[AVMetadataKey.commonKeyTitle.rawValue] as? String {
+            headers["x-amz-meta-video-title"] = title
+        }
+        if let artist = metadata[AVMetadataKey.commonKeyArtist.rawValue] as? String {
+            headers["x-amz-meta-video-artist"] = artist
+        }
+        if let software = metadata[AVMetadataKey.commonKeySoftware.rawValue] as? String {
+            headers["x-amz-meta-video-software"] = software
+        }
+        if let make = metadata[AVMetadataKey.commonKeyMake.rawValue] as? String {
+            headers["x-amz-meta-video-make"] = make
+        }
+        if let model = metadata[AVMetadataKey.commonKeyModel.rawValue] as? String {
+            headers["x-amz-meta-video-model"] = model
         }
         
         return headers
