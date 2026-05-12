@@ -41,6 +41,15 @@ struct APIManager{
             var headers = HTTPHeaders()
             headers["Content-Type"] = media.mimeType
             
+            // Add EXIF metadata headers for image uploads
+            if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
+                let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+                for (key, value) in exifHeaders {
+                    headers[key] = value
+                }
+                debugPrint("Added EXIF metadata headers: \(exifHeaders.keys.joined(separator: ", "))")
+            }
+            
             session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
             if (data.response?.statusCode == 200){
                 debugPrint("got upload success --->>\(data.response.debugDescription)")

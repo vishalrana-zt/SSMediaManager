@@ -50,8 +50,16 @@ public class SSMediaManager{
             }
             
         } else if (media.mimeType ?? "").hasPrefix("image") {
+            // Extract EXIF metadata before compression
+            var mediaWithEXIF = media
+            if let filePath = media.filePath {
+                let fileUrl = URL(fileURLWithPath: filePath)
+                mediaWithEXIF.exifMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
+                debugPrint("Extracted EXIF metadata for image: \(media.name)")
+            }
+            
             MediaCompressor.compressImage(fileName: media.name) {
-                self.uploadFile(media, baseS3URL, indexPath, index, completion)
+                self.uploadFile(mediaWithEXIF, baseS3URL, indexPath, index, completion)
             }
             
         }else{
