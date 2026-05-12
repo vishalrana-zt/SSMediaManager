@@ -48,6 +48,24 @@ extension TimeZone {
 // MARK: - EXIF Metadata Utilities
 class EXIFMetadataHelper {
     
+    /// Sanitize string values for S3 metadata headers (US-ASCII only, no control characters)
+    private static func sanitizeHeaderValue(_ value: String) -> String? {
+        // Remove non-ASCII characters and control characters
+        let sanitized = value
+            .components(separatedBy: .controlCharacters).joined()
+            .components(separatedBy: .newlines).joined()
+            .replacingOccurrences(of: "\t", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Only allow printable ASCII characters (32-126)
+        let asciiSanitized = sanitized.unicodeScalars
+            .filter { $0.value >= 32 && $0.value <= 126 }
+            .map { Character($0) }
+        
+        let result = String(asciiSanitized)
+        return result.isEmpty ? nil : result
+    }
+    
     /// Extract EXIF metadata from image file URL
     static func extractEXIF(from fileURL: URL) -> [String: Any]? {
         guard let imageSource = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
@@ -128,23 +146,28 @@ class EXIFMetadataHelper {
         
         // Extract key EXIF fields and format them for S3 metadata
         if let exif = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] {
-            if let dateTime = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String {
-                headers["x-amz-meta-exif-datetime-original"] = dateTime
+            if let dateTime = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
+               let sanitized = sanitizeHeaderValue(dateTime) {
+                headers["x-amz-meta-exif-datetime-original"] = sanitized
             }
-            if let make = exif[kCGImagePropertyExifCameraOwnerName as String] as? String {
-                headers["x-amz-meta-exif-camera-owner"] = make
+            if let make = exif[kCGImagePropertyExifCameraOwnerName as String] as? String,
+               let sanitized = sanitizeHeaderValue(make) {
+                headers["x-amz-meta-exif-camera-owner"] = sanitized
             }
         }
         
         if let tiff = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
-            if let make = tiff[kCGImagePropertyTIFFMake as String] as? String {
-                headers["x-amz-meta-exif-make"] = make
+            if let make = tiff[kCGImagePropertyTIFFMake as String] as? String,
+               let sanitized = sanitizeHeaderValue(make) {
+                headers["x-amz-meta-exif-make"] = sanitized
             }
-            if let model = tiff[kCGImagePropertyTIFFModel as String] as? String {
-                headers["x-amz-meta-exif-model"] = model
+            if let model = tiff[kCGImagePropertyTIFFModel as String] as? String,
+               let sanitized = sanitizeHeaderValue(model) {
+                headers["x-amz-meta-exif-model"] = sanitized
             }
-            if let software = tiff[kCGImagePropertyTIFFSoftware as String] as? String {
-                headers["x-amz-meta-exif-software"] = software
+            if let software = tiff[kCGImagePropertyTIFFSoftware as String] as? String,
+               let sanitized = sanitizeHeaderValue(software) {
+                headers["x-amz-meta-exif-software"] = sanitized
             }
         }
         
@@ -159,7 +182,7 @@ class EXIFMetadataHelper {
             }
         }
         
-        // Basic image properties
+        // Basic image properties (numbers are always safe)
         if let width = metadata[kCGImagePropertyPixelWidth as String] as? Int {
             headers["x-amz-meta-image-width"] = "\(width)"
         }
@@ -184,17 +207,19 @@ class EXIFMetadataHelper {
             if let date = creationDate as? Date {
                 let formatter = ISO8601DateFormatter()
                 headers["x-amz-meta-video-creation-date"] = formatter.string(from: date)
-            } else if let dateString = creationDate as? String {
-                headers["x-amz-meta-video-creation-date"] = dateString
+            } else if let dateString = creationDate as? String,
+                      let sanitized = sanitizeHeaderValue(dateString) {
+                headers["x-amz-meta-video-creation-date"] = sanitized
             }
         }
         
-        // Location (ISO 6709 format)
-        if let location = metadata["location"] as? String {
-            headers["x-amz-meta-video-location"] = location
+        // Location (ISO 6709 format) - usually safe but sanitize anyway
+        if let location = metadata["location"] as? String,
+           let sanitized = sanitizeHeaderValue(location) {
+            headers["x-amz-meta-video-location"] = sanitized
         }
         
-        // Video dimensions
+        // Video dimensions (numbers are always safe)
         if let width = metadata["videoWidth"] as? Int {
             headers["x-amz-meta-video-width"] = "\(width)"
         }
@@ -202,31 +227,36 @@ class EXIFMetadataHelper {
             headers["x-amz-meta-video-height"] = "\(height)"
         }
         
-        // Frame rate
+        // Frame rate (numbers are always safe)
         if let frameRate = metadata["videoFrameRate"] as? Float {
             headers["x-amz-meta-video-framerate"] = "\(frameRate)"
         }
         
-        // Duration
+        // Duration (numbers are always safe)
         if let duration = metadata["videoDuration"] as? Double {
             headers["x-amz-meta-video-duration"] = "\(duration)"
         }
         
-        // Common metadata keys
-        if let title = metadata[AVMetadataKey.commonKeyTitle.rawValue] as? String {
-            headers["x-amz-meta-video-title"] = title
+        // Common metadata keys - sanitize all string values
+        if let title = metadata[AVMetadataKey.commonKeyTitle.rawValue] as? String,
+           let sanitized = sanitizeHeaderValue(title) {
+            headers["x-amz-meta-video-title"] = sanitized
         }
-        if let artist = metadata[AVMetadataKey.commonKeyArtist.rawValue] as? String {
-            headers["x-amz-meta-video-artist"] = artist
+        if let artist = metadata[AVMetadataKey.commonKeyArtist.rawValue] as? String,
+           let sanitized = sanitizeHeaderValue(artist) {
+            headers["x-amz-meta-video-artist"] = sanitized
         }
-        if let software = metadata[AVMetadataKey.commonKeySoftware.rawValue] as? String {
-            headers["x-amz-meta-video-software"] = software
+        if let software = metadata[AVMetadataKey.commonKeySoftware.rawValue] as? String,
+           let sanitized = sanitizeHeaderValue(software) {
+            headers["x-amz-meta-video-software"] = sanitized
         }
-        if let make = metadata[AVMetadataKey.commonKeyMake.rawValue] as? String {
-            headers["x-amz-meta-video-make"] = make
+        if let make = metadata[AVMetadataKey.commonKeyMake.rawValue] as? String,
+           let sanitized = sanitizeHeaderValue(make) {
+            headers["x-amz-meta-video-make"] = sanitized
         }
-        if let model = metadata[AVMetadataKey.commonKeyModel.rawValue] as? String {
-            headers["x-amz-meta-video-model"] = model
+        if let model = metadata[AVMetadataKey.commonKeyModel.rawValue] as? String,
+           let sanitized = sanitizeHeaderValue(model) {
+            headers["x-amz-meta-video-model"] = sanitized
         }
         
         return headers

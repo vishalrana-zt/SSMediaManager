@@ -44,19 +44,27 @@ struct APIManager{
             // Add EXIF metadata headers for image uploads
             if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
                 let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
-                for (key, value) in exifHeaders {
-                    headers[key] = value
+                if !exifHeaders.isEmpty {
+                    for (key, value) in exifHeaders {
+                        headers[key] = value
+                    }
+                    debugPrint("Added \(exifHeaders.count) EXIF metadata headers: \(exifHeaders.keys.joined(separator: ", "))")
+                } else {
+                    debugPrint("No valid EXIF metadata headers to add")
                 }
-                debugPrint("Added EXIF metadata headers: \(exifHeaders.keys.joined(separator: ", "))")
             }
             
             // Add video metadata headers for video uploads
             if (media.mimeType ?? "").contains("video"), let videoMetadata = media.exifMetadata {
                 let videoHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: videoMetadata)
-                for (key, value) in videoHeaders {
-                    headers[key] = value
+                if !videoHeaders.isEmpty {
+                    for (key, value) in videoHeaders {
+                        headers[key] = value
+                    }
+                    debugPrint("Added \(videoHeaders.count) video metadata headers: \(videoHeaders.keys.joined(separator: ", "))")
+                } else {
+                    debugPrint("No valid video metadata headers to add")
                 }
-                debugPrint("Added video metadata headers: \(videoHeaders.keys.joined(separator: ", "))")
             }
             
             session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
