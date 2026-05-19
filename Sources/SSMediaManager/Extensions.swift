@@ -46,7 +46,7 @@ extension TimeZone {
     }
 }
 // MARK: - EXIF Metadata Utilities
-class EXIFMetadataHelper {
+public class EXIFMetadataHelper {
     
     /// Sanitize string values for S3 metadata headers (US-ASCII only, no control characters)
     private static func sanitizeHeaderValue(_ value: String) -> String? {
@@ -67,7 +67,7 @@ class EXIFMetadataHelper {
     }
     
     /// Extract EXIF metadata from image file URL
-    static func extractEXIF(from fileURL: URL) -> [String: Any]? {
+    public static func extractEXIF(from fileURL: URL) -> [String: Any]? {
         guard let imageSource = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
               let metadata = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
             return nil
@@ -76,7 +76,7 @@ class EXIFMetadataHelper {
     }
     
     /// Extract EXIF metadata from image data
-    static func extractEXIF(from imageData: Data) -> [String: Any]? {
+    public static func extractEXIF(from imageData: Data) -> [String: Any]? {
         guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil),
               let metadata = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
             return nil
@@ -154,14 +154,10 @@ class EXIFMetadataHelper {
     static func convertToS3Headers(exifMetadata: [String: Any]?) -> [String: String] {
         guard let metadata = exifMetadata else { return [:] }
         
-        // Debug: Log available EXIF keys
-        debugPrint("Available EXIF metadata keys: \(metadata.keys.joined(separator: ", "))")
-        
         var headers: [String: String] = [:]
         
         // Extract key EXIF fields and format them for S3 metadata
         if let exif = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] {
-            debugPrint("EXIF dictionary keys: \(exif.keys.joined(separator: ", "))")
             if let dateTime = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
                let sanitized = sanitizeHeaderValue(dateTime) {
                 headers["x-amz-meta-exif-datetime-original"] = sanitized
@@ -173,7 +169,6 @@ class EXIFMetadataHelper {
         }
         
         if let tiff = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
-            debugPrint("TIFF dictionary keys: \(tiff.keys.joined(separator: ", "))")
             if let make = tiff[kCGImagePropertyTIFFMake as String] as? String,
                let sanitized = sanitizeHeaderValue(make) {
                 headers["x-amz-meta-exif-make"] = sanitized
@@ -280,7 +275,7 @@ class EXIFMetadataHelper {
     }
     
     /// Save image with EXIF metadata preserved
-    static func saveImageWithEXIF(image: UIImage, to fileURL: URL, metadata: [String: Any]?) throws {
+    public static func saveImageWithEXIF(image: UIImage, to fileURL: URL, metadata: [String: Any]?) throws {
         guard let imageData = image.jpegData(compressionQuality: 1.0) else {
             throw NSError(domain: "EXIFMetadataHelper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
         }

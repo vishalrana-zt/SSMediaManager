@@ -42,7 +42,6 @@ struct APIManager{
             
             if !metadataHeaders.isEmpty {
                 params["metadata"] = metadataHeaders
-                debugPrint("Including \(metadataHeaders.count) metadata headers in presigned URL request")
             }
         }
         
@@ -54,7 +53,6 @@ struct APIManager{
     func uploadMediaWith(uploadUrl:String, media:SSMedia,indexPath: IndexPath?, index: Int?, json: [String: Any]?,completion:@escaping UploadCompletion){
         if let path = media.filePath{
             let url = URL(fileURLWithPath: path)
-            debugPrint("got filePath --->>\(path)")
             var headers = HTTPHeaders()
             headers["Content-Type"] = media.mimeType
             
@@ -66,7 +64,6 @@ struct APIManager{
                     for (key, value) in exifHeaders {
                         headers[key] = value
                     }
-                    debugPrint("Added \(exifHeaders.count) EXIF metadata headers: \(exifHeaders.keys.joined(separator: ", "))")
                 }
             }
             
@@ -78,18 +75,16 @@ struct APIManager{
                     for (key, value) in videoHeaders {
                         headers[key] = value
                     }
-                    debugPrint("Added \(videoHeaders.count) video metadata headers: \(videoHeaders.keys.joined(separator: ", "))")
                 }
             }
             
             session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
             if (data.response?.statusCode == 200){
-                debugPrint("got upload success --->>\(data.response.debugDescription)")
                 completion(json,nil,data.response,nil,indexPath,index)
                 return
             }
             if let error = data.error as NSError? {
-                debugPrint("got upload error --->>\(error.localizedDescription)")
+                debugPrint("Upload error: \(error.localizedDescription)")
                 completion(nil, nil, nil, error,indexPath,index)
                 return
             }

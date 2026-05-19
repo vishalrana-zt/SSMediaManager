@@ -36,7 +36,6 @@ public class SSMediaManager{
             if let filePath = media.filePath {
                 let fileUrl = URL(fileURLWithPath: filePath)
                 mediaWithMetadata.exifMetadata = EXIFMetadataHelper.extractVideoMetadata(from: fileUrl)
-                debugPrint("Extracted video metadata for: \(media.name)")
             }
             
             let fileNameWithoutExtension = self.removeExtension(fileName: media.name)
@@ -64,7 +63,6 @@ public class SSMediaManager{
             if let filePath = media.filePath {
                 let fileUrl = URL(fileURLWithPath: filePath)
                 mediaWithEXIF.exifMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
-                debugPrint("Extracted EXIF metadata for image: \(media.name)")
             }
             
             MediaCompressor.compressImage(fileName: media.name) {
