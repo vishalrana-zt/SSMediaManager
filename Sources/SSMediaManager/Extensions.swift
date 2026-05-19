@@ -154,6 +154,9 @@ class EXIFMetadataHelper {
     static func convertToS3Headers(exifMetadata: [String: Any]?) -> [String: String] {
         guard let metadata = exifMetadata else { return [:] }
         
+        // Debug: Log available EXIF keys
+        debugPrint("Available EXIF metadata keys: \(metadata.keys.joined(separator: ", "))")
+        
         var headers: [String: String] = [:]
         
         // Extract key EXIF fields and format them for S3 metadata
