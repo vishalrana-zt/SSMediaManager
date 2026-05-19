@@ -161,6 +161,7 @@ class EXIFMetadataHelper {
         
         // Extract key EXIF fields and format them for S3 metadata
         if let exif = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] {
+            debugPrint("EXIF dictionary keys: \(exif.keys.joined(separator: ", "))")
             if let dateTime = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
                let sanitized = sanitizeHeaderValue(dateTime) {
                 headers["x-amz-meta-exif-datetime-original"] = sanitized
@@ -172,6 +173,7 @@ class EXIFMetadataHelper {
         }
         
         if let tiff = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
+            debugPrint("TIFF dictionary keys: \(tiff.keys.joined(separator: ", "))")
             if let make = tiff[kCGImagePropertyTIFFMake as String] as? String,
                let sanitized = sanitizeHeaderValue(make) {
                 headers["x-amz-meta-exif-make"] = sanitized
