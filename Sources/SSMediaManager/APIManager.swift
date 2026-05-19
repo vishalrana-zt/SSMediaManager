@@ -29,6 +29,23 @@ struct APIManager{
         params["contentType"] = media.mimeType
         params["fileName"] = media.name
         params["moduleName"] = media.moduleType.rawValue
+        
+        // Add metadata to params so backend can include it in presigned URL signature
+        if let exifMetadata = media.exifMetadata {
+            var metadataHeaders: [String: String] = [:]
+            
+            if (media.mimeType ?? "").hasPrefix("image") {
+                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+            } else if (media.mimeType ?? "").contains("video") {
+                metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
+            }
+            
+            if !metadataHeaders.isEmpty {
+                params["metadata"] = metadataHeaders
+                debugPrint("Including \(metadataHeaders.count) metadata headers in presigned URL request")
+            }
+        }
+        
         session.request(baseS3URL,parameters:params).responseData { responseData in
             processAPIResponse(responseData: responseData,indexPath: indexPath, index: index, completion: completion)
         }
@@ -42,6 +59,7 @@ struct APIManager{
             headers["Content-Type"] = media.mimeType
             
             // Add EXIF metadata headers for image uploads
+            // These headers must match those sent to backend in getUploadUrl
             if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
                 let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
                 if !exifHeaders.isEmpty {
@@ -49,12 +67,11 @@ struct APIManager{
                         headers[key] = value
                     }
                     debugPrint("Added \(exifHeaders.count) EXIF metadata headers: \(exifHeaders.keys.joined(separator: ", "))")
-                } else {
-                    debugPrint("No valid EXIF metadata headers to add")
                 }
             }
             
             // Add video metadata headers for video uploads
+            // These headers must match those sent to backend in getUploadUrl
             if (media.mimeType ?? "").contains("video"), let videoMetadata = media.exifMetadata {
                 let videoHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: videoMetadata)
                 if !videoHeaders.isEmpty {
@@ -62,8 +79,6 @@ struct APIManager{
                         headers[key] = value
                     }
                     debugPrint("Added \(videoHeaders.count) video metadata headers: \(videoHeaders.keys.joined(separator: ", "))")
-                } else {
-                    debugPrint("No valid video metadata headers to add")
                 }
             }
             

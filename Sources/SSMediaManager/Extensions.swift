@@ -118,13 +118,25 @@ class EXIFMetadataHelper {
             }
         }
         
-        // Extract location
+        // Extract location - try multiple methods
+        // Method 1: QuickTime metadata (ISO 6709 format)
         let locationMetadata = asset.metadata(forFormat: .quickTimeMetadata).filter {
             $0.identifier == .quickTimeMetadataLocationISO6709
         }
         if let locationItem = locationMetadata.first,
            let locationString = locationItem.stringValue {
             metadata["location"] = locationString
+        }
+        
+        // Method 2: Try common location key
+        if metadata["location"] == nil {
+            for item in asset.commonMetadata {
+                if item.commonKey == .commonKeyLocation,
+                   let locationString = item.stringValue {
+                    metadata["location"] = locationString
+                    break
+                }
+            }
         }
         
         // Extract video track properties
@@ -227,14 +239,14 @@ class EXIFMetadataHelper {
             headers["x-amz-meta-video-height"] = "\(height)"
         }
         
-        // Frame rate (numbers are always safe)
+        // Frame rate - format to 2 decimal places
         if let frameRate = metadata["videoFrameRate"] as? Float {
-            headers["x-amz-meta-video-framerate"] = "\(frameRate)"
+            headers["x-amz-meta-video-framerate"] = String(format: "%.2f", frameRate)
         }
         
-        // Duration (numbers are always safe)
+        // Duration - format to 2 decimal places
         if let duration = metadata["videoDuration"] as? Double {
-            headers["x-amz-meta-video-duration"] = "\(duration)"
+            headers["x-amz-meta-video-duration"] = String(format: "%.2f", duration)
         }
         
         // Common metadata keys - sanitize all string values
