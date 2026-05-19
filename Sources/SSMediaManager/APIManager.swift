@@ -78,7 +78,7 @@ struct APIManager{
                 completion(nil, nil, nil, error,indexPath,index)
                 return
             }
-            completion(nil, nil, nil, NSError(domain: "something went wrong", code: data.response?.statusCode),indexPath,index)
+                completion(nil, nil, nil, NSError(domain: "something went wrong", code: data.response?.statusCode ?? 0),indexPath,index)
           }
         }
     }
