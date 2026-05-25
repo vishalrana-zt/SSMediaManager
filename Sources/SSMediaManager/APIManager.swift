@@ -46,13 +46,9 @@ struct APIManager{
         }
         
         let request = session.request(baseS3URL,parameters:params)
-        
-        debugPrint("📤 getUploadUrl CURL Request:")
         debugPrint(request.convertible.urlRequest?.cURL())
         
         request.responseData { responseData in
-            // Print CURL command for debugging
-            debugPrint(request.cURL())
             processAPIResponse(responseData: responseData,indexPath: indexPath, index: index, completion: completion)
         }
     }
