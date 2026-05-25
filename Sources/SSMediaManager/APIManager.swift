@@ -84,13 +84,7 @@ struct APIManager{
                 }
             }
             
-            let uploadRequest = session.upload(url, to: uploadUrl, method: .put, headers: headers)
-            
-            // Print CURL command for debugging
-            debugPrint("📤 S3 Upload CURL Request:")
-            debugPrint(uploadRequest.cURL())
-            
-            uploadRequest.responseData  { data in
+           session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
             if (data.response?.statusCode == 200){
                 completion(json,nil,data.response,nil,indexPath,index)
                 return
@@ -188,11 +182,16 @@ extension URLRequest {
     }
 }
 
-extension Request {
+extension DataRequest {
     public func cURL(pretty: Bool = true) -> String {
-        guard let urlRequest = self.request else {
-            return "curl command unavailable (request not yet created)"
+        // Try to get the request, if not available yet, use task
+        if let urlRequest = self.request {
+            return urlRequest.cURL(pretty: pretty)
+        } else if let task = self.task, let currentRequest = task.currentRequest {
+            return currentRequest.cURL(pretty: pretty)
         }
-        return urlRequest.cURL(pretty: pretty)
+        return "curl command unavailable (request not yet created)"
     }
 }
+
+
