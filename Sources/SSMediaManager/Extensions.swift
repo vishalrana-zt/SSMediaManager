@@ -201,9 +201,9 @@ public class EXIFMetadataHelper {
         if let height = metadata[kCGImagePropertyPixelHeight as String] as? Int {
             headers["x-amz-meta-image-height"] = "\(height)"
         }
-        if let orientation = metadata[kCGImagePropertyOrientation as String] as? Int {
-            headers["x-amz-meta-image-orientation"] = "\(orientation)"
-        }
+        // Always send orientation as 1 (normal/upright) since UIImage automatically
+        // rotates images during loading, so saved images are already correctly oriented
+        headers["x-amz-meta-image-orientation"] = "1"
         
         return headers
     }
@@ -289,8 +289,12 @@ public class EXIFMetadataHelper {
             throw NSError(domain: "EXIFMetadataHelper", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to create CGImage"])
         }
         
-        if let metadata = metadata {
-            CGImageDestinationAddImage(destination, cgImage, metadata as CFDictionary)
+        // Normalize orientation to 1 (up/normal) since UIImage already handles rotation
+        // When UIImage loads an image with orientation != 1, it automatically rotates the pixels
+        // So we need to update the metadata to reflect that the saved image is now upright
+        if var normalizedMetadata = metadata {
+            normalizedMetadata[kCGImagePropertyOrientation as String] = 1
+            CGImageDestinationAddImage(destination, cgImage, normalizedMetadata as CFDictionary)
         } else {
             CGImageDestinationAddImage(destination, cgImage, nil)
         }
