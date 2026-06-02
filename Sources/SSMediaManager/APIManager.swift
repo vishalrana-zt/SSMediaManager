@@ -30,21 +30,21 @@ struct APIManager{
         params["fileName"] = media.name
         params["moduleName"] = media.moduleType.rawValue
         
-//        // Add metadata to params so backend can include it in presigned URL signature
-//        if let exifMetadata = media.exifMetadata {
-//            var metadataHeaders: [String: String] = [:]
-//            
-//            if (media.mimeType ?? "").hasPrefix("image") {
-//                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
-//            } else if (media.mimeType ?? "").contains("video") {
-//                metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
-//            }
-//            
-//            if !metadataHeaders.isEmpty {
-//                params["metadata"] = metadataHeaders
-//            }
-//        }
-//        
+        // Add metadata to params so backend can include it in presigned URL signature
+        if let exifMetadata = media.exifMetadata {
+            var metadataHeaders: [String: String] = [:]
+            
+            if (media.mimeType ?? "").hasPrefix("image") {
+                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+            } else if (media.mimeType ?? "").contains("video") {
+                metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
+            }
+            
+            if !metadataHeaders.isEmpty {
+                params["metadata"] = metadataHeaders
+            }
+        }
+        
         let request = session.request(baseS3URL,parameters:params)
         debugPrint(request.convertible.urlRequest?.cURL())
         
@@ -59,27 +59,27 @@ struct APIManager{
             var headers = HTTPHeaders()
             headers["Content-Type"] = media.mimeType
             
-//            // Add EXIF metadata headers for image uploads
-//            // These headers must match those sent to backend in getUploadUrl
-//            if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
-//                let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
-//                if !exifHeaders.isEmpty {
-//                    for (key, value) in exifHeaders {
-//                        headers[key] = value
-//                    }
-//                }
-//            }
-//            
-//            // Add video metadata headers for video uploads
-//            // These headers must match those sent to backend in getUploadUrl
-//            if (media.mimeType ?? "").contains("video"), let videoMetadata = media.exifMetadata {
-//                let videoHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: videoMetadata)
-//                if !videoHeaders.isEmpty {
-//                    for (key, value) in videoHeaders {
-//                        headers[key] = value
-//                    }
-//                }
-//            }
+            // Add EXIF metadata headers for image uploads
+            // These headers must match those sent to backend in getUploadUrl
+            if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
+                let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+                if !exifHeaders.isEmpty {
+                    for (key, value) in exifHeaders {
+                        headers[key] = value
+                    }
+                }
+            }
+            
+            // Add video metadata headers for video uploads
+            // These headers must match those sent to backend in getUploadUrl
+            if (media.mimeType ?? "").contains("video"), let videoMetadata = media.exifMetadata {
+                let videoHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: videoMetadata)
+                if !videoHeaders.isEmpty {
+                    for (key, value) in videoHeaders {
+                        headers[key] = value
+                    }
+                }
+            }
             
            session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
             if (data.response?.statusCode == 200){
