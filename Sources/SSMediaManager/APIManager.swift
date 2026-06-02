@@ -30,21 +30,21 @@ struct APIManager{
         params["fileName"] = media.name
         params["moduleName"] = media.moduleType.rawValue
         
-        // Add metadata to params so backend can include it in presigned URL signature
-        if let exifMetadata = media.exifMetadata {
-            var metadataHeaders: [String: String] = [:]
-            
-            if (media.mimeType ?? "").hasPrefix("image") {
-                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
-            } else if (media.mimeType ?? "").contains("video") {
-                metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
-            }
-            
-            if !metadataHeaders.isEmpty {
-                params["metadata"] = metadataHeaders
-            }
-        }
-        
+//        // Add metadata to params so backend can include it in presigned URL signature
+//        if let exifMetadata = media.exifMetadata {
+//            var metadataHeaders: [String: String] = [:]
+//            
+//            if (media.mimeType ?? "").hasPrefix("image") {
+//                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+//            } else if (media.mimeType ?? "").contains("video") {
+//                metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
+//            }
+//            
+//            if !metadataHeaders.isEmpty {
+//                params["metadata"] = metadataHeaders
+//            }
+//        }
+//        
         let request = session.request(baseS3URL,parameters:params)
         debugPrint(request.convertible.urlRequest?.cURL())
         
