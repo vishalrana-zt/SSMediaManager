@@ -30,6 +30,14 @@ public class SSMediaManager{
     public func uploadFileWith(media:SSMedia, baseS3URL: String, indexPath: IndexPath?=nil, index: Int?=0, completion:@escaping UploadCompletion){
         if((media.mimeType ?? "").contains("video")){
             let inputUrl = URL(fileURLWithPath:media.filePath ?? "")
+            
+            // Extract video metadata before compression
+            var mediaWithMetadata = media
+            if let filePath = media.filePath {
+                let fileUrl = URL(fileURLWithPath: filePath)
+                mediaWithMetadata.exifMetadata = EXIFMetadataHelper.extractVideoMetadata(from: fileUrl)
+            }
+            
             let fileNameWithoutExtension = self.removeExtension(fileName: media.name)
             let fileManager = FileManager.default
             let documentsUrl = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -39,19 +47,26 @@ public class SSMediaManager{
                 if error == nil, url != nil{
                     try? FileManager.default.removeItem(at: inputUrl)
                     try? FileManager.default.moveItem(at: outputUrl, to: inputUrl)
-                    var tempMedia = media
+                    var tempMedia = mediaWithMetadata
                     tempMedia.filePath = inputUrl.path
                     tempMedia.mimeType = "video/mp4"
                     self.uploadFile(tempMedia, baseS3URL, indexPath, index, completion)
                 }else{
                     debugPrint("Error in compression>>\(error)")
-                    self.uploadFile(media, baseS3URL, indexPath, index, completion)
+                    self.uploadFile(mediaWithMetadata, baseS3URL, indexPath, index, completion)
                 }
             }
             
         } else if (media.mimeType ?? "").hasPrefix("image") {
+            // Extract EXIF metadata before compression
+            var mediaWithEXIF = media
+            if let filePath = media.filePath {
+                let fileUrl = URL(fileURLWithPath: filePath)
+                mediaWithEXIF.exifMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
+            }
+            
             MediaCompressor.compressImage(fileName: media.name) {
-                self.uploadFile(media, baseS3URL, indexPath, index, completion)
+                self.uploadFile(mediaWithEXIF, baseS3URL, indexPath, index, completion)
             }
             
         }else{

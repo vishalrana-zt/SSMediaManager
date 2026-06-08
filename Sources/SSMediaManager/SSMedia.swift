@@ -15,8 +15,9 @@ public struct SSMedia: Equatable{
     public var serverUrl:String? = nil
     public var templateId:String? = nil
     public var moduleType: SSModuleType
+    public var exifMetadata: [String: Any]? = nil
 
-    public init(name:String,id:String? = nil,mimeType:String?=nil,filePath:String? = nil,data:Data? = nil, templateId:String? = nil, serverUrl:String?=nil, moduleType:SSModuleType){
+    public init(name:String,id:String? = nil,mimeType:String?=nil,filePath:String? = nil,data:Data? = nil, templateId:String? = nil, serverUrl:String?=nil, moduleType:SSModuleType, exifMetadata: [String: Any]? = nil){
         self.name = name
         self.id = id
         self.mimeType = mimeType
@@ -25,6 +26,18 @@ public struct SSMedia: Equatable{
         self.templateId = templateId
         self.serverUrl = serverUrl
         self.moduleType = moduleType
+        self.exifMetadata = exifMetadata
+    }
+    
+    public static func == (lhs: SSMedia, rhs: SSMedia) -> Bool {
+        return lhs.name == rhs.name &&
+               lhs.id == rhs.id &&
+               lhs.mimeType == rhs.mimeType &&
+               lhs.filePath == rhs.filePath &&
+               lhs.data == rhs.data &&
+               lhs.serverUrl == rhs.serverUrl &&
+               lhs.templateId == rhs.templateId &&
+               lhs.moduleType == rhs.moduleType
     }
     
 }

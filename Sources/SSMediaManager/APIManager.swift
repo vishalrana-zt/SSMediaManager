@@ -29,7 +29,26 @@ struct APIManager{
         params["contentType"] = media.mimeType
         params["fileName"] = media.name
         params["moduleName"] = media.moduleType.rawValue
-        session.request(baseS3URL,parameters:params).responseData { responseData in
+        
+        // Add metadata to params so backend can include it in presigned URL signature
+        if let exifMetadata = media.exifMetadata {
+            var metadataHeaders: [String: String] = [:]
+            
+            if (media.mimeType ?? "").hasPrefix("image") {
+                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+            } else if (media.mimeType ?? "").contains("video") {
+                metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
+            }
+            
+            if !metadataHeaders.isEmpty {
+                params["metadata"] = metadataHeaders
+            }
+        }
+        
+        let request = session.request(baseS3URL,parameters:params)
+        debugPrint(request.convertible.urlRequest?.cURL())
+        
+        request.responseData { responseData in
             processAPIResponse(responseData: responseData,indexPath: indexPath, index: index, completion: completion)
         }
     }
@@ -37,21 +56,42 @@ struct APIManager{
     func uploadMediaWith(uploadUrl:String, media:SSMedia,indexPath: IndexPath?, index: Int?, json: [String: Any]?,completion:@escaping UploadCompletion){
         if let path = media.filePath{
             let url = URL(fileURLWithPath: path)
-            debugPrint("got filePath --->>\(path)")
             var headers = HTTPHeaders()
             headers["Content-Type"] = media.mimeType
             
-            session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
+            // Add EXIF metadata headers for image uploads
+            // These headers must match those sent to backend in getUploadUrl
+            if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
+                let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata)
+                if !exifHeaders.isEmpty {
+                    for (key, value) in exifHeaders {
+                        headers[key] = value
+                    }
+                }
+            }
+            
+            // Add video metadata headers for video uploads
+            // These headers must match those sent to backend in getUploadUrl
+            if (media.mimeType ?? "").contains("video"), let videoMetadata = media.exifMetadata {
+                let videoHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: videoMetadata)
+                if !videoHeaders.isEmpty {
+                    for (key, value) in videoHeaders {
+                        headers[key] = value
+                    }
+                }
+            }
+            
+           session.upload(url, to: uploadUrl, method: .put, headers: headers).responseData  { data in
             if (data.response?.statusCode == 200){
-                debugPrint("got upload success --->>\(data.response.debugDescription)")
                 completion(json,nil,data.response,nil,indexPath,index)
                 return
             }
             if let error = data.error as NSError? {
-                debugPrint("got upload error --->>\(error.localizedDescription)")
+                debugPrint("Upload error: \(error.localizedDescription)")
                 completion(nil, nil, nil, error,indexPath,index)
                 return
             }
+                completion(nil, nil, nil, NSError(domain: "something went wrong", code: data.response?.statusCode ?? 0),indexPath,index)
           }
         }
     }
@@ -111,3 +151,44 @@ final class RequestInterceptor: Alamofire.RequestInterceptor{
 
     
 }
+
+
+extension URLRequest {
+    public func cURL(pretty: Bool = true) -> String {
+        let newLine = pretty ? "\\\n" : ""
+        let method = (pretty ? "--request " : "-X ") + "\(self.httpMethod ?? "GET") \(newLine)"
+        let url: String = (pretty ? "--url " : "") + "\'\(self.url?.absoluteString ?? "")\' \(newLine)"
+
+        var cURL = "curl "
+        var header = ""
+        var data: String = ""
+
+        if let httpHeaders = self.allHTTPHeaderFields, httpHeaders.keys.count > 0 {
+            for (key,value) in httpHeaders {
+                header += (pretty ? "--header " : "-H ") + "\'\(key): \(value)\' \(newLine)"
+            }
+        }
+
+        if let bodyData = self.httpBody, let bodyString = String(data: bodyData, encoding: .utf8),  !bodyString.isEmpty {
+            data = "--data '\(bodyString)'"
+        }
+
+        cURL += method + url + header + data
+
+        return cURL
+    }
+}
+
+extension DataRequest {
+    public func cURL(pretty: Bool = true) -> String {
+        // Try to get the request, if not available yet, use task
+        if let urlRequest = self.request {
+            return urlRequest.cURL(pretty: pretty)
+        } else if let task = self.task, let currentRequest = task.currentRequest {
+            return currentRequest.cURL(pretty: pretty)
+        }
+        return "curl command unavailable (request not yet created)"
+    }
+}
+
+

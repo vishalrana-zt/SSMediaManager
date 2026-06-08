@@ -50,9 +50,16 @@ class MediaCompressor {
             return
         }
         guard let image = load(fileName: fileName),
-              let fileUrl = documentsUrl?.appendingPathComponent(fileName),
+              let fileUrl = documentsUrl?.appendingPathComponent(fileName) else {
+            completion()
+            return
+        }
+        
+        // Extract EXIF metadata before compression
+        let originalMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
+        
         // Convert the image to JPEG format
-        let jpegData = image.jpegData(compressionQuality: 1.0) else {
+        guard let jpegData = image.jpegData(compressionQuality: 1.0) else {
             completion()
             return
         }
@@ -62,8 +69,12 @@ class MediaCompressor {
         
         // Check if the newly converted file needs compression
         if isToCompressFile(fromPath: fileUrl.path , compressionMode: compressionMode),
-           let compressedData = image.compressImage(compressionMode: compressionMode){
-            try? compressedData.write(to: fileUrl, options: .atomic)
+           let compressedImage = image.resizedForCompression(to: compressionMode) {
+            // Save compressed image with EXIF metadata preserved
+            try? EXIFMetadataHelper.saveImageWithEXIF(image: compressedImage, to: fileUrl, metadata: originalMetadata)
+        } else {
+            // Save without compression but preserve EXIF
+            try? EXIFMetadataHelper.saveImageWithEXIF(image: image, to: fileUrl, metadata: originalMetadata)
         }
         completion()
     }
@@ -164,6 +175,9 @@ extension UIImage {
         return imageData
     }
     
+    func resizedForCompression(to compressionMode: CompressionMode) -> UIImage? {
+        return self.resized(to: compressionMode)
+    }
     
 }
 
