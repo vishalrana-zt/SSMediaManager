@@ -276,10 +276,8 @@ public class EXIFMetadataHelper {
     
     /// Save image with EXIF metadata preserved
     public static func saveImageWithEXIF(image: UIImage, to fileURL: URL, metadata: [String: Any]?) throws {
-        // Fix orientation to .up so that pixels are physically rotated
         let uprightImage = image.fixedOrientation()
-        
-        // Get the underlying CGImage. If it's nil (e.g. CIImage backed), convert it.
+
         guard let cgImage = uprightImage.cgImage ?? uprightImage.ciImage.flatMap({ ciImage in
             let context = CIContext()
             return context.createCGImage(ciImage, from: ciImage.extent)
@@ -293,15 +291,20 @@ public class EXIFMetadataHelper {
         
         // Create a normalized metadata dictionary
         var finalMetadata = metadata ?? [:]
-        
-        // Force all possible orientation tags to 1 (Upright)
+
+        // Force orientation to upright in all metadata locations
         finalMetadata[kCGImagePropertyOrientation as String] = 1
-        
+
         if var tiff = finalMetadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
             tiff[kCGImagePropertyTIFFOrientation as String] = 1
             finalMetadata[kCGImagePropertyTIFFDictionary as String] = tiff
         }
-        
+
+        if var exif = finalMetadata[kCGImagePropertyExifDictionary as String] as? [String: Any] {
+            exif.removeValue(forKey: kCGImagePropertyExifSubjectArea as String)
+            finalMetadata[kCGImagePropertyExifDictionary as String] = exif
+        }
+
         CGImageDestinationAddImage(destination, cgImage, finalMetadata as CFDictionary)
         
         if !CGImageDestinationFinalize(destination) {
@@ -312,18 +315,27 @@ public class EXIFMetadataHelper {
 
 extension UIImage {
     /// Returns an image with orientation fixed to .up by redrawing it.
-    /// This physically rotates the pixels so that the image is natively upright.
     func fixedOrientation() -> UIImage {
-        if imageOrientation == .up { return self }
+        guard imageOrientation != .up else { return self }
+        
+        let needsSwap: Bool
+        switch imageOrientation {
+        case .left, .leftMirrored, .right, .rightMirrored:
+            needsSwap = true
+        default:
+            needsSwap = false
+        }
+        
+        let canvasSize = needsSwap
+        ? CGSize(width: size.height, height: size.width)
+        : size
         
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
-        format.opaque = false // Preserve transparency if any
+        format.opaque = false
         
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        return renderer.image { _ in
-            self.draw(in: CGRect(origin: .zero, size: size))
-        }
+        return UIGraphicsImageRenderer(size: canvasSize, format: format)
+            .image { _ in self.draw(in: CGRect(origin: .zero, size: canvasSize)) }
     }
 }
 

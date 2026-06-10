@@ -42,73 +42,59 @@ class MediaCompressor {
     }
     
     class func compressImage(fileName: String, completion: @escaping() -> Void) {
-        
         let modeValue = UserDefaults.standard.value(forKey: "CompressionModeFloat") as? CGFloat ?? 0.5
-        let compressionMode = CompressionMode(rawValue: modeValue) ?? CompressionMode.medium
-        if compressionMode == .noCompression{
-            completion()
-            return
-        }
-        guard let image = load(fileName: fileName),
+        let compressionMode = CompressionMode(rawValue: modeValue) ?? .medium
+
+        guard compressionMode != .noCompression,
+              let image = load(fileName: fileName),
               let fileUrl = documentsUrl?.appendingPathComponent(fileName) else {
             completion()
             return
         }
-        
-        // Extract EXIF metadata before compression
+
+        // Extract EXIF before touching the file
         let originalMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
-        
-        // Convert the image to JPEG format
-        guard let jpegData = image.jpegData(compressionQuality: 1.0) else {
-            completion()
-            return
-        }
-        
-        // Save the JPEG data with the original file extension
-        try? jpegData.write(to: fileUrl, options: .atomic)
-        
-        // Check if the newly converted file needs compression
-        if isToCompressFile(fromPath: fileUrl.path , compressionMode: compressionMode),
-           let compressedImage = image.resizedForCompression(to: compressionMode) {
-            // Save compressed image with EXIF metadata preserved
-            try? EXIFMetadataHelper.saveImageWithEXIF(image: compressedImage, to: fileUrl, metadata: originalMetadata)
+
+        // Decide whether to resize based on original file size (before any write)
+        let shouldCompress = isToCompressFile(fromPath: fileUrl.path, compressionMode: compressionMode)
+        let imageToSave: UIImage
+
+        if shouldCompress, let resized = image.resizedForCompression(to: compressionMode) {
+            imageToSave = resized
         } else {
-            // Save without compression but preserve EXIF
-            try? EXIFMetadataHelper.saveImageWithEXIF(image: image, to: fileUrl, metadata: originalMetadata)
+            imageToSave = image
         }
+
+        // Single save path — always preserves EXIF, always fixes orientation
+        do {
+            try EXIFMetadataHelper.saveImageWithEXIF(image: imageToSave, to: fileUrl, metadata: originalMetadata)
+        } catch {
+            // Fallback: at least write the JPEG so the file isn't lost
+            image.jpegData(compressionQuality: 1.0).flatMap { try? $0.write(to: fileUrl, options: .atomic) }
+        }
+
         completion()
     }
     
     // MARK: - Get file size from file manager
-    private class func isToCompressFile(fromPath path: String, compressionMode:CompressionMode = .noCompression) -> Bool {
-        guard let size = try? FileManager.default.attributesOfItem(atPath: path)[FileAttributeKey.size],
-              let fileSize = size as? UInt64 else {
+    private class func isToCompressFile(fromPath path: String, compressionMode: CompressionMode = .noCompression) -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let fileSize = attrs[.size] as? UInt64,
+              fileSize >= 1024 else {
             return false
         }
-        if fileSize < 1023 {
-             return false
+
+        // Float conversion before division to avoid integer truncation
+        let sizeInMB = Float(fileSize) / (1024 * 1024)
+
+        guard sizeInMB >= 1.0 else { return false }
+
+        switch compressionMode {
+        case .high:   return sizeInMB > 1
+        case .medium: return sizeInMB > 3
+        case .low:    return sizeInMB > 5
+        default:      return false
         }
-        var floatSize = Float(fileSize / 1024)
-        if floatSize < 1023 {
-            print(String(format: "%.0f KB", floatSize))
-            return false
-        }
-        floatSize = floatSize / 1024
-        if floatSize < 1023 {
-            print(String(format: "%.0f MB", floatSize))
-            switch compressionMode {
-            case .high:
-                return floatSize > 1
-            case .medium:
-                return floatSize > 3
-            case.low:
-                return floatSize > 5
-            default:
-                return false
-            }
-        }
-        floatSize = floatSize / 1024
-        return true
     }
     
     class func load(fileName: String) -> UIImage? {
