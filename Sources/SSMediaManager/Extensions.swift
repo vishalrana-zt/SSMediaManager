@@ -151,23 +151,20 @@ public class EXIFMetadataHelper {
     }
     
     /// Convert EXIF metadata to S3 metadata headers format
-    static func convertToS3Headers(exifMetadata: [String: Any]?) -> [String: String] {
+    static func convertToS3Headers(exifMetadata: [String: Any]?, fileURL: URL? = nil) -> [String: String] {
         guard let metadata = exifMetadata else { return [:] }
         
         var headers: [String: String] = [:]
         
-        // Extract key EXIF fields and format them for S3 metadata
+        // EXIF dictionary
         if let exif = metadata[kCGImagePropertyExifDictionary as String] as? [String: Any] {
             if let dateTime = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
                let sanitized = sanitizeHeaderValue(dateTime) {
                 headers["x-amz-meta-exif-datetime-original"] = sanitized
             }
-            if let make = exif[kCGImagePropertyExifCameraOwnerName as String] as? String,
-               let sanitized = sanitizeHeaderValue(make) {
-                headers["x-amz-meta-exif-camera-owner"] = sanitized
-            }
         }
         
+        // TIFF dictionary
         if let tiff = metadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
             if let make = tiff[kCGImagePropertyTIFFMake as String] as? String,
                let sanitized = sanitizeHeaderValue(make) {
@@ -183,26 +180,39 @@ public class EXIFMetadataHelper {
             }
         }
         
+        // GPS dictionary — capped to 6 decimal places
         if let gps = metadata[kCGImagePropertyGPSDictionary as String] as? [String: Any] {
             if let latitude = gps[kCGImagePropertyGPSLatitude as String] as? Double,
                let latitudeRef = gps[kCGImagePropertyGPSLatitudeRef as String] as? String {
-                headers["x-amz-meta-exif-gps-latitude"] = "\(latitude)\(latitudeRef)"
+                headers["x-amz-meta-exif-gps-latitude"] = String(format: "%.6f%@", latitude, latitudeRef)
             }
             if let longitude = gps[kCGImagePropertyGPSLongitude as String] as? Double,
                let longitudeRef = gps[kCGImagePropertyGPSLongitudeRef as String] as? String {
-                headers["x-amz-meta-exif-gps-longitude"] = "\(longitude)\(longitudeRef)"
+                headers["x-amz-meta-exif-gps-longitude"] = String(format: "%.6f%@", longitude, longitudeRef)
             }
         }
         
-        // Basic image properties (numbers are always safe)
-        if let width = metadata[kCGImagePropertyPixelWidth as String] as? Int {
-            headers["x-amz-meta-image-width"] = "\(width)"
+        // Width/Height — read from saved file on disk (reflects actual compressed dimensions)
+        if let url = fileURL,
+           let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+           let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] {
+            if let width = props[kCGImagePropertyPixelWidth as String] as? Int {
+                headers["x-amz-meta-image-width"] = "\(width)"
+            }
+            if let height = props[kCGImagePropertyPixelHeight as String] as? Int {
+                headers["x-amz-meta-image-height"] = "\(height)"
+            }
+        } else {
+            // Fallback to original EXIF if file not available
+            if let width = metadata[kCGImagePropertyPixelWidth as String] as? Int {
+                headers["x-amz-meta-image-width"] = "\(width)"
+            }
+            if let height = metadata[kCGImagePropertyPixelHeight as String] as? Int {
+                headers["x-amz-meta-image-height"] = "\(height)"
+            }
         }
-        if let height = metadata[kCGImagePropertyPixelHeight as String] as? Int {
-            headers["x-amz-meta-image-height"] = "\(height)"
-        }
-        // Always send orientation as 1 (normal/upright) since UIImage automatically
-        // rotates images during loading, so saved images are already correctly oriented
+        
+        // Always upright — pixels are physically rotated before save
         headers["x-amz-meta-image-orientation"] = "1"
         
         return headers
