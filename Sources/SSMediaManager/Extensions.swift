@@ -276,29 +276,33 @@ public class EXIFMetadataHelper {
     
     /// Save image with EXIF metadata preserved
     public static func saveImageWithEXIF(image: UIImage, to fileURL: URL, metadata: [String: Any]?) throws {
-        // Fix orientation to .up so that setting orientation metadata to 1 is correct
+        // Fix orientation to .up so that pixels are physically rotated
         let uprightImage = image.fixedOrientation()
         
-        guard let imageData = uprightImage.jpegData(compressionQuality: 1.0) else {
-            throw NSError(domain: "EXIFMetadataHelper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
+        // Get the underlying CGImage. If it's nil (e.g. CIImage backed), convert it.
+        guard let cgImage = uprightImage.cgImage ?? uprightImage.ciImage.flatMap({ ciImage in
+            let context = CIContext()
+            return context.createCGImage(ciImage, from: ciImage.extent)
+        }) else {
+            throw NSError(domain: "EXIFMetadataHelper", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to get CGImage from UIImage"])
         }
         
         guard let destination = CGImageDestinationCreateWithURL(fileURL as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
             throw NSError(domain: "EXIFMetadataHelper", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to create image destination"])
         }
         
-        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            throw NSError(domain: "EXIFMetadataHelper", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to create CGImage"])
+        // Create a normalized metadata dictionary
+        var finalMetadata = metadata ?? [:]
+        
+        // Force all possible orientation tags to 1 (Upright)
+        finalMetadata[kCGImagePropertyOrientation as String] = 1
+        
+        if var tiff = finalMetadata[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
+            tiff[kCGImagePropertyTIFFOrientation as String] = 1
+            finalMetadata[kCGImagePropertyTIFFDictionary as String] = tiff
         }
         
-        // Normalize orientation to 1 (up/normal) since we just fixed the orientation
-        if var normalizedMetadata = metadata {
-            normalizedMetadata[kCGImagePropertyOrientation as String] = 1
-            CGImageDestinationAddImage(destination, cgImage, normalizedMetadata as CFDictionary)
-        } else {
-            CGImageDestinationAddImage(destination, cgImage, nil)
-        }
+        CGImageDestinationAddImage(destination, cgImage, finalMetadata as CFDictionary)
         
         if !CGImageDestinationFinalize(destination) {
             throw NSError(domain: "EXIFMetadataHelper", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to finalize image destination"])
@@ -307,14 +311,16 @@ public class EXIFMetadataHelper {
 }
 
 extension UIImage {
-    /// Returns an image with orientation fixed to .up by redrawing it
+    /// Returns an image with orientation fixed to .up by redrawing it.
+    /// This physically rotates the pixels so that the image is natively upright.
     func fixedOrientation() -> UIImage {
         if imageOrientation == .up { return self }
         
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        format.opaque = false // Preserve transparency if any
         
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { _ in
             self.draw(in: CGRect(origin: .zero, size: size))
         }
