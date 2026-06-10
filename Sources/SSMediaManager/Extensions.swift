@@ -276,7 +276,10 @@ public class EXIFMetadataHelper {
     
     /// Save image with EXIF metadata preserved
     public static func saveImageWithEXIF(image: UIImage, to fileURL: URL, metadata: [String: Any]?) throws {
-        guard let imageData = image.jpegData(compressionQuality: 1.0) else {
+        // Fix orientation to .up so that setting orientation metadata to 1 is correct
+        let uprightImage = image.fixedOrientation()
+        
+        guard let imageData = uprightImage.jpegData(compressionQuality: 1.0) else {
             throw NSError(domain: "EXIFMetadataHelper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
         }
         
@@ -289,9 +292,7 @@ public class EXIFMetadataHelper {
             throw NSError(domain: "EXIFMetadataHelper", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to create CGImage"])
         }
         
-        // Normalize orientation to 1 (up/normal) since UIImage already handles rotation
-        // When UIImage loads an image with orientation != 1, it automatically rotates the pixels
-        // So we need to update the metadata to reflect that the saved image is now upright
+        // Normalize orientation to 1 (up/normal) since we just fixed the orientation
         if var normalizedMetadata = metadata {
             normalizedMetadata[kCGImagePropertyOrientation as String] = 1
             CGImageDestinationAddImage(destination, cgImage, normalizedMetadata as CFDictionary)
@@ -301,6 +302,21 @@ public class EXIFMetadataHelper {
         
         if !CGImageDestinationFinalize(destination) {
             throw NSError(domain: "EXIFMetadataHelper", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to finalize image destination"])
+        }
+    }
+}
+
+extension UIImage {
+    /// Returns an image with orientation fixed to .up by redrawing it
+    func fixedOrientation() -> UIImage {
+        if imageOrientation == .up { return self }
+        
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        
+        return renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: size))
         }
     }
 }
