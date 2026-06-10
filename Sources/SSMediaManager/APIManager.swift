@@ -35,7 +35,7 @@ struct APIManager{
             var metadataHeaders: [String: String] = [:]
             
             if (media.mimeType ?? "").hasPrefix("image") {
-                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata, fileURL: URL(filePath: media.filePath ?? ""))
+                metadataHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata, fileURL: URL(fileURLWithPath: media.filePath ?? ""))
             } else if (media.mimeType ?? "").contains("video") {
                 metadataHeaders = EXIFMetadataHelper.convertVideoMetadataToS3Headers(videoMetadata: exifMetadata)
             }
@@ -62,7 +62,7 @@ struct APIManager{
             // Add EXIF metadata headers for image uploads
             // These headers must match those sent to backend in getUploadUrl
             if (media.mimeType ?? "").hasPrefix("image"), let exifMetadata = media.exifMetadata {
-                let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata, fileURL: URL(filePath: media.filePath ?? "")
+                let exifHeaders = EXIFMetadataHelper.convertToS3Headers(exifMetadata: exifMetadata, fileURL: URL(fileURLWithPath: media.filePath ?? ""))
                 if !exifHeaders.isEmpty {
                     for (key, value) in exifHeaders {
                         headers[key] = value
