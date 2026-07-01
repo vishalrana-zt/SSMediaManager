@@ -326,7 +326,7 @@ public class EXIFMetadataHelper {
 extension UIImage {
     /// Returns an image with orientation fixed to .up by redrawing it.
     func fixedOrientation() -> UIImage {
-        guard imageOrientation != .up else { return self }
+//        guard imageOrientation != .up else { return self }
         
         let needsSwap: Bool
         switch imageOrientation {

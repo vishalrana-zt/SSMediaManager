@@ -41,39 +41,30 @@ class MediaCompressor {
         }
     }
     
-    class func compressImage(fileName: String, completion: @escaping() -> Void) {
-        let modeValue = UserDefaults.standard.value(forKey: "CompressionModeFloat") as? CGFloat ?? 0.5
-        let compressionMode = CompressionMode(rawValue: modeValue) ?? .medium
+    class func compressImage(fileName: String, completion: @escaping () -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let modeValue = UserDefaults.standard.value(forKey: "CompressionModeFloat") as? CGFloat ?? 0.5
+            let compressionMode = CompressionMode(rawValue: modeValue) ?? .medium
 
-        guard compressionMode != .noCompression,
-              let image = load(fileName: fileName),
-              let fileUrl = documentsUrl?.appendingPathComponent(fileName) else {
-            completion()
-            return
+            guard compressionMode != .noCompression,
+                  let image = load(fileName: fileName),
+                  let fileUrl = documentsUrl?.appendingPathComponent(fileName) else {
+                DispatchQueue.main.async { completion() }
+                return
+            }
+
+            let originalMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
+            let shouldCompress = isToCompressFile(fromPath: fileUrl.path, compressionMode: compressionMode)
+            let imageToSave: UIImage = (shouldCompress ? image.resizedForCompression(to: compressionMode) : nil) ?? image
+
+            do {
+                try EXIFMetadataHelper.saveImageWithEXIF(image: imageToSave, to: fileUrl, metadata: originalMetadata)
+            } catch {
+                image.jpegData(compressionQuality: 1.0).flatMap { try? $0.write(to: fileUrl, options: .atomic) }
+            }
+
+            DispatchQueue.main.async { completion() }
         }
-
-        // Extract EXIF before touching the file
-        let originalMetadata = EXIFMetadataHelper.extractEXIF(from: fileUrl)
-
-        // Decide whether to resize based on original file size (before any write)
-        let shouldCompress = isToCompressFile(fromPath: fileUrl.path, compressionMode: compressionMode)
-        let imageToSave: UIImage
-
-        if shouldCompress, let resized = image.resizedForCompression(to: compressionMode) {
-            imageToSave = resized
-        } else {
-            imageToSave = image
-        }
-
-        // Single save path — always preserves EXIF, always fixes orientation
-        do {
-            try EXIFMetadataHelper.saveImageWithEXIF(image: imageToSave, to: fileUrl, metadata: originalMetadata)
-        } catch {
-            // Fallback: at least write the JPEG so the file isn't lost
-            image.jpegData(compressionQuality: 1.0).flatMap { try? $0.write(to: fileUrl, options: .atomic) }
-        }
-
-        completion()
     }
     
     // MARK: - Get file size from file manager
